@@ -1,27 +1,33 @@
-def train words
-  words.inject(Hash.new(1)){|h,w| h[w] += 1; h}
+class SpellingCorrector
+  def initialize dict
+    @alphabets = ('a'..'z').to_a
+    @words = File.open(dict){|f| f.read}
+      .split(/\W/)
+      .map{|s| s.downcase}
+      .inject(Hash.new(1)){|h, w| h[w] += 1; h}
+  end
+  private def edit1 word
+    sz = word.size
+    # deletion, transposition, alteration, insertion
+    [
+      (0...sz).map{|i| word[0...i] + word[i+1..-1]},
+      (0...sz - 1).map{|i| word[0...i] + word[i+1] + word[i] + word[i+2..-1]},
+      (0...sz).map{|i| @alphabets.map{|c| word[0...i] + c + word[i+1..-1]}},
+      (0...sz + 1).map{|i| @alphabets.map{|c| word[0...i] + c + word[i..-1]}}
+    ]
+      .flatten.uniq
+  end
+  private def edit2 word
+    edit1(word).map{|w| edit1(w)}.flatten
+  end
+  private def known words
+    r = words.select{|w| @words.include?(w)}
+    r.size > 0 ? r : nil
+  end
+  def correct s
+    s.downcase.split
+      .map{|w| known([w]) || known(edit1(w)) || known(edit2(w)) || [w]}
+      .map{|ws| ws.max_by{|w| @words[w]}}
+      .join(' ')
+  end
 end
-
-$nwords = train(File.open('train.txt'){|f| f.read}.split(/\W/).map{|s| s.downcase})
-$alphabets = 'abcdefghijklmnopqrstuvwxyz'.split(//)
-
-def edits1 word
-  [
-    (0...word.size).map{|i| "#{word[0...i]}#{word[i+1..-1]}"}, # deletion
-    (0...word.size-1).map{|i| "#{word[0...i]}#{word[i+1]}#{word[i]}#{word[i+2..-1]}"}, # transposition
-    (0...word.size).map{|i| $alphabets.map{|c| "#{word[0...i]}#{c}#{word[i+1..-1]}"}}, # alteration
-    (0...word.size+1).map{|i| $alphabets.map{|c| "#{word[0...i]}#{c}#{word[i..-1]}"}} # insertion
-  ].flatten.uniq
-end
-def edits2 word
-  edits1(word).map{|w| edits1(w)}.flatten
-end
-def known words
-  r = words.select{|w| $nwords.include?(w)}
-  r.size > 0 ? r : nil
-end
-def correct word
-  (known([word]) || known(edits1(word)) || known(edits2(word)) || [word])
-    .max_by{|w| $nwords[w]}
-end
-
